@@ -431,10 +431,24 @@ void main( void )
         asteroid.style.top = '0px';
         asteroid.style.left = Math.random() * (window.innerWidth) + 'px';
 
-        asteroid.style.backgroundImage = 'url(images/asteroid.png)';
-        asteroid.style.width = '91px';
-        asteroid.style.height = '200px';
-        asteroid.style.backgroundRepeat = "no-repeat";
+
+
+
+        const probability = 0.10;
+
+        if (Math.random() <= probability) {
+            asteroid.style.backgroundImage = 'url(images/ufo.png)';
+            asteroid.style.width = '100px';
+            asteroid.style.height = '79px';
+            asteroid.style.backgroundRepeat = "no-repeat";
+        }
+        else{
+            asteroid.style.backgroundImage = 'url(images/asteroid.png)';
+            asteroid.style.width = '91px';
+            asteroid.style.height = '200px';
+            asteroid.style.backgroundRepeat = "no-repeat";
+        }
+
 
         let rando = Math.random() * 50 + 50;
 
