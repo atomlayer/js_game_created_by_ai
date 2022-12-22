@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>Game</title>
+    <style>
+
+        body {
+            overflow: hidden;
+        }
+    </style>
+
+</head>
+<body>
+
+
+<div id="container"></div>
+<script src="//cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+        uniform float time;
+        uniform vec2 resolution;
+        void main()	{
+            gl_Position = vec4( position, 1.0 );
+        }
+
+
+
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+
+uniform float time;
+uniform vec2 mouse;
+uniform vec2 resolution;
+
+#define M_PI 3.1415926535897932384626433832795
+
+vec2 rand2(vec2 p)
+{
+    p = vec2(dot(p, vec2(12.9898,78.233)), dot(p, vec2(26.65125, 83.054543)));
+    return fract(sin(p) * 43758.5453);
+}
+
+float rand(vec2 p)
+{
+    return fract(sin(dot(p.xy ,vec2(54.90898,18.233))) * 4337.5453);
+}
+
+// Thanks to David Hoskins https://www.shadertoy.com/view/4djGRh
+float stars(in vec2 x, float numCells, float size, float br)
+{
+    vec2 n = x * numCells;
+    vec2 f = floor(n);
+
+	float d = 1.0e10;
+    for (int i = -1; i <= 1; ++i)
+    {
+        for (int j = -1; j <= 1; ++j)
+        {
+            vec2 g = f + vec2(float(i), float(j));
+			g = n - g - rand2(mod(g, numCells)) + rand(g);
+            // Control size
+            g *= 1. / (numCells * size);
+			d = min(d, dot(g, g));
+        }
+    }
+
+    return br * (smoothstep(.95, 1., (1. - sqrt(d))));
+}
+
+void main( void )
+{
+    float resolution = max(resolution.y, resolution.y);
+
+    vec2 coord = gl_FragCoord.xy / resolution;
+
+    vec3 result = vec3(0.);
+    result += stars(vec2(coord.y + time * 0.15,coord.x) , 1., 0.10, 2.)  * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.2,coord.x) , 1., 0.10, 2.)  * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.3,coord.x) , 1., 0.10, 2.)  * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.05,coord.x) , 2., 0.09, 2.) * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.11,coord.x) , 4., 0.08, 2.) * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.1,coord.x), 8., 0.05, 1.) * vec3(.74, .74, .74);
+    result += stars(vec2(coord.y + time * 0.025,coord.x), 10., 0.05,0.8) * vec3(.95, .95, .95);
+    result += stars(coord  , 20., 0.025, 0.5) * vec3(.9, .9, .95);
+
+    gl_FragColor = vec4(result, 1.);
+}
+
+</script>
+<script>
+    var container;
+    var camera, scene, renderer;
+    var uniforms, material, mesh;
+    var mouseX = 0, mouseY = 0,
+        lat = 0, lon = 0, phy = 0, theta = 0;
+
+    var windowHalfX = window.innerWidth / 2;
+    var windowHalfY = window.innerHeight / 2;
+
+
+    var mixer;
+
+    var clock;
+
+    init();
+    var startTime = Date.now();
+    animate();
+
+    function init() {
+        container = document.getElementById('container');
+
+        camera = new THREE.Camera();
+        camera.position.z = 1;
+        scene = new THREE.Scene();
+
+        uniforms = {
+            time: {type: "f", value: 1.0},
+            resolution: {type: "v2", value: new THREE.Vector2()}
+        };
+
+        material = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent
+        });
+
+        mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+        scene.add(mesh);
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1);
+        container.appendChild(renderer.domElement);
+
+        uniforms.resolution.value.x = window.innerWidth;
+        uniforms.resolution.value.y = window.innerHeight;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        mixer = new THREE.AnimationMixer(mesh);
+
+        clock = new THREE.Clock();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        render();
+
+        const delta = clock.getDelta();
+        mixer.update(delta, 0.016); // Limit frame rate to 60 fps
+    }
+
+    function render() {
+        var elapsedMilliseconds = Date.now() - startTime;
+        var elapsedSeconds = elapsedMilliseconds / 1000.;
+        uniforms.time.value = 60. * elapsedSeconds;
+        renderer.render(scene, camera);
+    }
+</script>
+
+
+<script type="text/javascript">
+
+
+    window.onscroll = function (event) {
+        event.preventDefault();
+    };
+
+
+    function keepObjectOnScreen(object) {
+        // Get the dimensions of the object and the window
+        const objectWidth = object.offsetWidth;
+        const objectHeight = object.offsetHeight;
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Get the current position of the object
+        const objectTop = object.offsetTop;
+        const objectLeft = object.offsetLeft;
+
+        // Check if the object is going off the screen
+        if (objectTop < 0) {
+            // If the object is going off the top of the screen,
+            // set its top position to 0
+            object.style.top = '0';
+        } else if (objectTop + objectHeight > windowHeight) {
+            // If the object is going off the bottom of the screen,
+            // set its top position so that it stays on the screen
+            object.style.top = `${windowHeight - objectHeight}px`;
+        }
+
+        if (objectLeft < 0) {
+            // If the object is going off the left side of the screen,
+            // set its left position to 0
+            object.style.left = '0';
+        } else if (objectLeft + objectWidth > windowWidth) {
+            // If the object is going off the right side of the screen,
+            // set its left position so that it stays on the screen
+            object.style.left = `${windowWidth - objectWidth}px`;
+        }
+    }
+
+
+    var spaceship = document.createElement('img');
+    spaceship.src = 'images/spaceship.png';
+    spaceship.style.position = 'absolute';
+    spaceship.style.left = window.innerWidth / 2 + 'px';
+    spaceship.style.top = window.innerHeight - 300 + 'px';
+    document.body.appendChild(spaceship);
+    /* The picture for the spaceship should be reduced to 5% */
+    spaceship.style.width = '5%';
+    /* The spaceship can move by pressing the arrows on the keyboard up, down, left, right. The spaceship must not leave the game screen. */
+    var spaceshipPosition = {
+        x: window.innerWidth / 2,
+        y: window.innerHeight - 100
+    };
+
+
+
+    function moveSpaceship(x, y) {
+        spaceshipPosition.x += x;
+        spaceshipPosition.y += y;
+        spaceship.style.left = spaceshipPosition.x + 'px';
+        spaceship.style.top = spaceshipPosition.y + 'px';
+        keepObjectOnScreen(spaceship);
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'ArrowUp') {
+            moveSpaceship(0, -40);
+        } else if (event.key === 'ArrowDown') {
+            moveSpaceship(0, 40);
+        } else if (event.key === 'ArrowLeft') {
+            moveSpaceship(-40, 0);
+        } else if (event.key === 'ArrowRight') {
+            moveSpaceship(40, 0);
+        }
+    });
+
+
+    function add_bg() {
+        /* add and display background image https://hightech.fm/wp-content/uploads/2020/11/shutterstock_261909215.jpg */
+        var background = document.createElement('img');
+        background.src = 'images/bg.jpg';
+        document.body.appendChild(background);
+        /* stretches background  image on screen size */
+        background.style.width = '100%';
+        background.style.height = '100%';
+        background.style.position = 'absolute';
+        background.style.top = '0';
+        background.style.left = '0';
+        /* make background image below layers */
+        background.style.zIndex = '-1';
+    }
+
+
+    var max_score = document.createElement('div');
+    max_score.style.position = 'absolute';
+    max_score.style.right = '5px';
+    max_score.style.top = '5px';
+    max_score.style.fontSize = '40px';
+    max_score.style.color = 'white';
+    max_score.innerHTML = 'Max score: 0';
+    document.body.appendChild(max_score);
+    max_score.style.color = 'red';
+
+
+    var score = document.createElement('div');
+    score.style.position = 'absolute';
+    score.style.right = '5px';
+    score.style.top = '65px';
+    score.style.fontSize = '40px';
+    score.style.color = 'white';
+    score.innerHTML = 'Score: 0';
+    document.body.appendChild(score);
+    score.style.color = 'red';
+
+
+
+    function get_score(){
+        return parseInt((score.innerHTML).split(': ')[1]);
+    }
+
+    function update_score(new_score){
+        score.innerHTML = "Score: " + new_score;
+    }
+
+    function get_max_score(){
+        return parseInt((max_score.innerHTML).split(': ')[1]);
+    }
+
+    function update_max_score(new_max_score){
+        max_score.innerHTML = "Max score: " + new_max_score;
+    }
+
+
+    function add_score(score_value) {
+
+        let new_score = get_score()+score_value;
+
+        update_score(new_score);
+
+        if (get_score()>get_max_score())
+        {
+            update_max_score(new_score)
+        }
+
+    }
+
+
+    function add_game_over_label() {
+        // Create the text element
+        var textElement = document.createElement('div');
+
+        // Set the text content
+        textElement.innerHTML = 'Game over';
+
+        // Set the text styling
+        textElement.style.fontSize = '72px';
+        textElement.style.color = 'red';
+        textElement.style.textAlign = 'center';
+
+        // Position the text in the middle of the screen
+        textElement.style.position = 'absolute';
+        textElement.style.top = '50%';
+        textElement.style.left = '50%';
+        textElement.style.transform = 'translate(-50%, -50%)';
+
+        // Add the text to the body of the page
+        document.body.appendChild(textElement);
+    }
+
+
+    function add_game_over_mex_score_label(score) {
+        // Create the element
+        var element = document.createElement('div');
+
+        // Set the element's content
+        element.innerHTML ="Max score "+ score;
+
+        // Set the element's styling
+        element.style.fontSize = '60px';
+        element.style.color = 'red';
+        element.style.textAlign = 'center';
+
+        // Position the element slightly below the center of the screen
+        element.style.position = 'absolute';
+        element.style.top = '55%';
+        element.style.left = '50%';
+        element.style.transform = 'translate(-50%, 50%)';
+
+        // Add the element to the body of the page
+        document.body.appendChild(element);
+    }
+
+
+
+    var lost_score = 1500;
+
+
+    function game_over(asteroid, asteroidInterval) {
+
+
+        if (get_score() >= lost_score) {
+
+            var newScore = get_score() - lost_score;
+            lost_score +=200;
+            update_score(newScore);
+
+            clearInterval(asteroidInterval);
+            document.body.removeChild(asteroid);
+
+            return;
+        }
+
+
+        clearInterval(main_asteroidInterval);
+
+        document.body.innerHTML = '';
+
+        add_bg();
+
+        add_game_over_label();
+        add_game_over_mex_score_label(get_max_score())
+
+
+    }
+
+
+    function checkCollision(obj1, obj2) {
+
+        let rect1 = obj1.getBoundingClientRect();
+        let x1 = rect1.left + rect1.width / 2;
+        let y1 = rect1.top + rect1.height / 2;
+        let hitboxRadius1 = obj1.clientWidth/2;
+
+        let rect2 = obj2.getBoundingClientRect();
+        let x2 = rect2.left + rect2.width / 2;
+        let y2 = rect2.top + rect2.height / 2;
+        let hitboxRadius2 = obj2.clientWidth/2;
+
+
+
+
+        let dx = x1 - x2;
+        let dy = y1 - y2;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < hitboxRadius1 + hitboxRadius2;
+    }
+
+
+
+
+    var current_interval = 200;
+
+
+    var main_asteroidInterval = setInterval(function () {
+
+        console.log(current_interval);
+
+
+        current_interval -= 40;
+
+        var asteroid = document.createElement('div');
+        asteroid.style.position = 'absolute';
+        asteroid.style.top = '0px';
+        asteroid.style.left = Math.random() * (window.innerWidth) + 'px';
+
+        asteroid.style.backgroundImage = 'url(https://raw.githubusercontent.com/atomlayer/js_game_created_by_ai/master/js_game/images/asteroid.png)';
+        asteroid.style.width = '91px';
+        asteroid.style.height = '200px';
+        asteroid.style.backgroundRepeat = "no-repeat";
+
+        let rando = Math.random() * 50 + 50;
+
+        asteroid.style.backgroundSize = `${rando}% ${rando}%`;
+
+
+        document.body.appendChild(asteroid);
+        var asteroidSpeed = Math.floor(Math.random() * 5) + 1;
+        var asteroidInterval = setInterval(function () {
+            var asteroidTop = parseInt(asteroid.style.top);
+            asteroid.style.top = asteroidTop + asteroidSpeed + 'px';
+
+            if (checkCollision(spaceship, asteroid)){
+                game_over(asteroid, asteroidInterval);
+            }
+
+
+            if (asteroidTop > window.innerHeight) {
+                clearInterval(asteroidInterval);
+                document.body.removeChild(asteroid);
+                add_score(100)
+            }
+        }, 5);
+    }, current_interval);
+
+
+</script>
+</body>
+</html>
